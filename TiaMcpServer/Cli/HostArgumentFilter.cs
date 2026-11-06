@@ -16,14 +16,17 @@ public static class HostArgumentFilter
             var arg = args[i];
             if (string.Equals(arg, "--read-only", StringComparison.OrdinalIgnoreCase) ||
                 string.Equals(arg, "--read-write", StringComparison.OrdinalIgnoreCase) ||
-                arg.StartsWith("--access-mode=", StringComparison.OrdinalIgnoreCase))
+                string.Equals(arg, "--mock", StringComparison.OrdinalIgnoreCase) ||
+                arg.StartsWith("--access-mode=", StringComparison.OrdinalIgnoreCase) ||
+                arg.StartsWith("--worker-path=", StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
 
-            if (string.Equals(arg, "--access-mode", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(arg, "--access-mode", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(arg, "--worker-path", StringComparison.OrdinalIgnoreCase))
             {
-                // AccessModeParser validates the value before this filter runs.
+                // Option parsers validate the value before this filter runs.
                 if (i + 1 < args.Length)
                 {
                     i++;

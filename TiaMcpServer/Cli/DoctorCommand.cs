@@ -7,7 +7,7 @@ namespace TiaMcpServer.Cli;
 public static class DoctorCommand
 {
     private const string UsageText = """
-        Usage: tia-mcp doctor [--json] [--verbose] [--project <path>] [--access-mode <mode>] [--worker-timeout-minutes <n>] [--help]
+        Usage: tia-mcp doctor [--json] [--verbose] [--project <path>] [--access-mode <mode>] [--worker-timeout-minutes <n>] [--mock] [--worker-path <path>] [--help]
 
         Options:
           --json          Emit a single JSON document to stdout.
@@ -17,6 +17,8 @@ public static class DoctorCommand
           --read-only     Alias for --access-mode read-only.
           --read-write    Alias for --access-mode read-write.
           --worker-timeout-minutes  Report worker timeout in whole minutes (5-60).
+          --mock          Run diagnostics against mock worker (TiaMcpServer.FakeWorker).
+          --worker-path   Specify explicit worker executable path.
           --help          Show command usage and exit.
 
         Exit codes:
@@ -107,8 +109,8 @@ public static class DoctorCommand
             new TiaPortalInstallationCheck(env, registry, fileSystem),
             new OpennessAssembliesCheck(env, registry, fileSystem),
             new OpennessGroupCheck(identity),
-            new OpennessWorkerCheck(appInfo, fileSystem),
-            new HostWorkerVersionCheck(appInfo, fileSystem),
+            new OpennessWorkerCheck(appInfo, fileSystem, options.WorkerSelection),
+            new HostWorkerVersionCheck(appInfo, fileSystem, options.WorkerSelection),
             new TiaPortalProcessCheck(
                 processes,
                 appInfo,

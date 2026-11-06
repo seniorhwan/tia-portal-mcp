@@ -74,9 +74,25 @@ namespace TiaMcpServer
                 return 1;
             }
 
+            var workerSelection = WorkerPathParser.Parse(args);
+            if (!workerSelection.IsValid)
+            {
+                Console.Error.WriteLine($"Error: {workerSelection.Error}");
+                return 1;
+            }
+
             Console.Error.WriteLine($"TIA MCP access mode: {McpAccessModeNames.ToName(accessMode).ToUpperInvariant()}");
             Console.Error.WriteLine($"TIA MCP response budget: {budgetResult.ItemChars} characters per value, {budgetResult.DocumentChars} per response");
             Console.Error.WriteLine($"TIA MCP worker timeout: {workerTimeout.Minutes} minutes");
+            if (workerSelection.IsMock)
+            {
+                Console.Error.WriteLine($"TIA MCP worker: MOCK ({workerSelection.WorkerPath})");
+            }
+            else if (workerSelection.WorkerPath is not null)
+            {
+                Console.Error.WriteLine($"TIA MCP worker override: {workerSelection.WorkerPath}");
+            }
+
             if (accessMode == McpAccessMode.ReadOnly)
             {
                 Console.Error.WriteLine("Project opening, compilation, writes and lifecycle operations are disabled.");
@@ -94,6 +110,7 @@ namespace TiaMcpServer
             builder.Services.AddSingleton(sp => new OpennessWorkerClient(
                 sp.GetRequiredService<ProjectSessionBinding>(),
                 sp.GetRequiredService<ILogger<OpennessWorkerClient>>(),
+                workerExecutablePath: workerSelection.WorkerPath,
                 requestTimeout: workerTimeout.Timeout,
                 accessPolicy: sp.GetRequiredService<OperationAccessPolicy>()));
             builder.Services.AddSingleton(sp => new WriteExecution(

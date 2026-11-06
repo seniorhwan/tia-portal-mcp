@@ -277,9 +277,11 @@ public partial class OpennessWorkerClient
             // (InvalidOperationException), or malformed/protocol-desynced JSON (JsonException) —
             // all mean the worker cannot be trusted to have completed the request as sent.
             InvalidateVerifiedBinding("the Openness worker crashed or its protocol stream was lost");
+            var crashGuidance = WorkerTransportFailureGuidance.CrashGuidance(request.Method);
+            var errorMessage = FormatWorkerCrashMessage(crashGuidance, ex);
             return WorkerCallResult.Fail(
                 WorkerFailureCategories.WorkerCrashed,
-                WorkerTransportFailureGuidance.CrashGuidance(request.Method)) with
+                errorMessage) with
             {
                 DispatchState = WorkerDispatchState.Unknown
             };
@@ -354,6 +356,55 @@ public partial class OpennessWorkerClient
             + WarningTruncationTrailer;
     }
 
+    private static string FormatWorkerCrashMessage(string guidance, Exception ex)
+    {
+        if (ex is InvalidOperationException && !string.IsNullOrWhiteSpace(ex.Message))
+        {
+            const string prefix = "TIA Openness worker exited without a response. ";
+            var detail = ex.Message.StartsWith(prefix, StringComparison.Ordinal)
+                ? ex.Message.Substring(prefix.Length).Trim()
+                : ex.Message.Trim();
+
+            if (!string.IsNullOrEmpty(detail) && !string.Equals(detail, "No response was written.", StringComparison.Ordinal))
+            {
+                return $"{guidance} Worker error: {detail}";
+            }
+        }
+        else if (ex is JsonException jsonEx)
+        {
+            return $"{guidance} Worker response was invalid JSON: {jsonEx.Message}";
+        }
+        else if (ex is IOException ioEx)
+        {
+            return $"{guidance} Worker communication channel lost: {ioEx.Message}";
+        }
+
+        return guidance;
+    }
+
     private static string LocateWorkerExecutable()
-        => OpennessWorkerLocator.LocateOrThrow(AppContext.BaseDirectory, FileSystemService.Instance);
+    {
+        var envWorkerPath = Environment.GetEnvironmentVariable("TIA_MCP_WORKER_PATH");
+        if (!string.IsNullOrWhiteSpace(envWorkerPath))
+        {
+            var trimmed = envWorkerPath.Trim();
+            if (File.Exists(trimmed))
+            {
+                return trimmed;
+            }
+            throw new FileNotFoundException(
+                $"TIA Openness worker executable specified by TIA_MCP_WORKER_PATH was not found at '{trimmed}'.",
+                trimmed);
+        }
+
+        var useFake = Environment.GetEnvironmentVariable("TIA_MCP_USE_FAKE_WORKER");
+        if (string.Equals(useFake, "1", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(useFake, "true", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(useFake, "yes", StringComparison.OrdinalIgnoreCase))
+        {
+            return OpennessWorkerLocator.LocateFakeWorkerOrThrow(AppContext.BaseDirectory, FileSystemService.Instance);
+        }
+
+        return OpennessWorkerLocator.LocateOrThrow(AppContext.BaseDirectory, FileSystemService.Instance);
+    }
 }

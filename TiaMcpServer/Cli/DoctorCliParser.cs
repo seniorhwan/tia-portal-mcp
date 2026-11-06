@@ -12,6 +12,7 @@ public sealed record DoctorCliOptions(
     string? ParseError)
 {
     public WorkerTimeoutParseResult? WorkerTimeout { get; init; }
+    public WorkerPathParseResult? WorkerSelection { get; init; }
 }
 
 public static class DoctorCliParser
@@ -53,6 +54,12 @@ public static class DoctorCliParser
         if (!workerTimeout.IsValid)
         {
             return new DoctorCliOptions(false, json, verbose, help, null, accessMode, workerTimeout.Error);
+        }
+
+        var workerSelection = WorkerPathParser.Parse(args, getEnvironmentVariable);
+        if (!workerSelection.IsValid)
+        {
+            return new DoctorCliOptions(false, json, verbose, help, null, accessMode, workerSelection.Error);
         }
 
         for (int i = 0; i < args.Length; i++)
@@ -140,12 +147,29 @@ public static class DoctorCliParser
                 continue;
             }
 
+            if (string.Equals(arg, WorkerPathParser.MockFlag, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (arg.StartsWith(WorkerPathParser.WorkerPathFlag + "=", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (string.Equals(arg, WorkerPathParser.WorkerPathFlag, StringComparison.OrdinalIgnoreCase))
+            {
+                i++;
+                continue;
+            }
+
             return new DoctorCliOptions(false, json, verbose, help, projectPath, accessMode, $"Unknown doctor argument: '{arg}'.");
         }
 
         return new DoctorCliOptions(true, json, verbose, help, projectPath, accessMode, null)
         {
-            WorkerTimeout = workerTimeout
+            WorkerTimeout = workerTimeout,
+            WorkerSelection = workerSelection
         };
     }
 }

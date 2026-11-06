@@ -526,9 +526,18 @@ public class OpennessWorkerClientIntegrationTests
         Assert.Contains(
             failed.FailureCategory,
             new[] { WorkerFailureCategories.WorkerTimeout, WorkerFailureCategories.WorkerCrashed });
-        Assert.Equal(
-            scenario == "hang" ? SafeReadTimeout : SafeReadCrash,
-            failed.Error);
+        if (scenario == "hang")
+        {
+            Assert.Equal(SafeReadTimeout, failed.Error);
+        }
+        else
+        {
+            Assert.StartsWith(SafeReadCrash, failed.Error);
+            if (scenario == "crash")
+            {
+                Assert.Contains("worker crashed during attach", failed.Error);
+            }
+        }
 
         // The failed write was issued exactly once (no internal retry loop). A fresh worker
         // process serves the next request - seq resets to 1, proving the timed-out/lost request
@@ -559,7 +568,11 @@ public class OpennessWorkerClientIntegrationTests
 
         Assert.False(lost.Success);
         Assert.Equal(WorkerFailureCategories.WorkerCrashed, lost.FailureCategory);
-        Assert.Equal(SafeReadCrash, lost.Error);
+        Assert.StartsWith(SafeReadCrash, lost.Error);
+        if (scenario == "crash")
+        {
+            Assert.Contains("worker crashed during attach", lost.Error);
+        }
         Assert.True(recovered.Success);
         // A fresh process restarts its request counter — proves the crashed/lost worker was
         // restarted for the NEXT call only, never replayed for the one that was lost.
@@ -650,7 +663,8 @@ public class OpennessWorkerClientIntegrationTests
 
         Assert.False(result.Success);
         Assert.Equal(WorkerFailureCategories.WorkerCrashed, result.FailureCategory);
-        Assert.Equal(SafeReadCrash, result.Error);
+        Assert.StartsWith(SafeReadCrash, result.Error);
+        Assert.Contains("worker crashed during attach", result.Error);
         Assert.Equal(ProjectBindingSnapshot.InvalidatedState, binding.CaptureSnapshot().State);
         await AssertWorkerRestartedForNextCallerAsync(client);
     }
@@ -696,7 +710,8 @@ public class OpennessWorkerClientIntegrationTests
 
         Assert.False(result.Success);
         Assert.Equal(WorkerFailureCategories.WorkerCrashed, result.FailureCategory);
-        Assert.Equal(StateAffectingCrash, result.Error);
+        Assert.StartsWith(StateAffectingCrash, result.Error);
+        Assert.Contains("worker crashed during attach", result.Error);
         Assert.Equal(ProjectBindingSnapshot.InvalidatedState, binding.CaptureSnapshot().State);
         await AssertWorkerRestartedForNextCallerAsync(client);
     }

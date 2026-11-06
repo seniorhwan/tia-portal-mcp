@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "tia-portal": {
+      "command": ".\\TiaMcpServer\\bin\\Release\\net10.0\\TiaMcpServer.exe",
+      "args": [
+        "--access-mode",
+        "read-write"
+      ],
+      "env": {
+        "TIA_MCP_WORKER_TIMEOUT_MINUTES": "5"
+      }
+    }
+  }
+}

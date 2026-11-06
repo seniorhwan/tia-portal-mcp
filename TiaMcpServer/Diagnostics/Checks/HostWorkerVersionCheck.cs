@@ -1,3 +1,4 @@
+using TiaMcpServer.Cli;
 using TiaMcpServer.Worker;
 
 namespace TiaMcpServer.Diagnostics.Checks;
@@ -6,11 +7,16 @@ public sealed class HostWorkerVersionCheck : IDiagnosticCheck
 {
     private readonly IApplicationInfoService _appInfo;
     private readonly IFileSystemService _fileSystem;
+    private readonly WorkerPathParseResult? _workerSelection;
 
-    public HostWorkerVersionCheck(IApplicationInfoService appInfo, IFileSystemService fileSystem)
+    public HostWorkerVersionCheck(
+        IApplicationInfoService appInfo,
+        IFileSystemService fileSystem,
+        WorkerPathParseResult? workerSelection = null)
     {
         _appInfo = appInfo;
         _fileSystem = fileSystem;
+        _workerSelection = workerSelection;
     }
 
     public string Id => "host-worker-version";
@@ -22,8 +28,21 @@ public sealed class HostWorkerVersionCheck : IDiagnosticCheck
         var hostVersion = _appInfo.HostVersion;
         evidence["hostVersion"] = hostVersion;
 
-        var workerLocation = OpennessWorkerLocator.Locate(_appInfo.BaseDirectory, _fileSystem);
-        if (!workerLocation.Found || workerLocation.SelectedPath is null)
+        string? workerPath = null;
+        if (_workerSelection?.WorkerPath is not null && _fileSystem.FileExists(_workerSelection.WorkerPath))
+        {
+            workerPath = _workerSelection.WorkerPath;
+        }
+        else
+        {
+            var workerLocation = OpennessWorkerLocator.Locate(_appInfo.BaseDirectory, _fileSystem);
+            if (workerLocation.Found && workerLocation.SelectedPath is not null)
+            {
+                workerPath = workerLocation.SelectedPath;
+            }
+        }
+
+        if (workerPath is null)
         {
             return new DiagnosticCheckResult(
                 Id,
@@ -34,8 +53,8 @@ public sealed class HostWorkerVersionCheck : IDiagnosticCheck
                 evidence);
         }
 
-        var workerVersion = _fileSystem.GetFileVersion(workerLocation.SelectedPath);
-        evidence["workerPath"] = workerLocation.SelectedPath;
+        var workerVersion = _fileSystem.GetFileVersion(workerPath);
+        evidence["workerPath"] = workerPath;
         evidence["workerVersion"] = workerVersion;
 
         if (string.IsNullOrWhiteSpace(workerVersion))

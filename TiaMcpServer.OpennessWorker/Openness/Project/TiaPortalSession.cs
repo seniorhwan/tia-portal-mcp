@@ -1029,7 +1029,14 @@ public class TiaPortalSession : IDisposable
     public void Dispose()
     {
         if (_disposed) return;
-        Disconnect();
+        try
+        {
+            Disconnect();
+        }
+        catch (FileNotFoundException)
+        {
+            // Best effort cleanup: ignore assembly load failures when Siemens Openness is absent during shutdown
+        }
         _disposed = true;
         GC.SuppressFinalize(this);
     }

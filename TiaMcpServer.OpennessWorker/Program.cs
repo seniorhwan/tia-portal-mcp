@@ -227,11 +227,23 @@ internal static partial class Program
         }
         catch (Exception ex)
         {
-            // Type + message only — never the full exception (which includes a stack trace) —
-            // since this is captured into the response's Warnings by HandleLineWithCapturedStderr.
-            Console.Error.WriteLine($"Unhandled worker exception: {ex.GetType().Name}: {ex.Message}");
-            return Failure(WorkerFailureCategories.WorkerOperationFailed, $"{ex.GetType().Name}: {ex.Message}");
+            var formattedException = FormatExceptionMessage(ex);
+            Console.Error.WriteLine($"Unhandled worker exception: {formattedException}");
+            return Failure(WorkerFailureCategories.WorkerOperationFailed, formattedException);
         }
+    }
+
+    private static string FormatExceptionMessage(Exception ex)
+    {
+        var sb = new System.Text.StringBuilder();
+        sb.Append(ex.GetType().Name).Append(": ").Append(ex.Message);
+        var current = ex.InnerException;
+        while (current is not null)
+        {
+            sb.Append(" ---> ").Append(current.GetType().Name).Append(": ").Append(current.Message);
+            current = current.InnerException;
+        }
+        return sb.ToString();
     }
 
     private static WorkerResponse ListPortalProcesses(WorkerRequest request)

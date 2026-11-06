@@ -1,3 +1,4 @@
+using TiaMcpServer.Cli;
 using TiaMcpServer.Worker;
 
 namespace TiaMcpServer.Diagnostics.Checks;
@@ -22,11 +23,16 @@ public sealed class OpennessWorkerCheck : IDiagnosticCheck
 
     private readonly IApplicationInfoService _appInfo;
     private readonly IFileSystemService _fileSystem;
+    private readonly WorkerPathParseResult? _workerSelection;
 
-    public OpennessWorkerCheck(IApplicationInfoService appInfo, IFileSystemService fileSystem)
+    public OpennessWorkerCheck(
+        IApplicationInfoService appInfo,
+        IFileSystemService fileSystem,
+        WorkerPathParseResult? workerSelection = null)
     {
         _appInfo = appInfo;
         _fileSystem = fileSystem;
+        _workerSelection = workerSelection;
     }
 
     public string Id => "openness-worker";
@@ -34,8 +40,84 @@ public sealed class OpennessWorkerCheck : IDiagnosticCheck
 
     public DiagnosticCheckResult Run()
     {
-        var result = OpennessWorkerLocator.Locate(_appInfo.BaseDirectory, _fileSystem);
         var evidence = Evidence.Empty();
+
+        if (_workerSelection?.IsMock == true)
+        {
+            evidence["isMock"] = "true";
+            evidence["workerSelectionSource"] = _workerSelection.Source.ToString();
+
+            var mockPath = _workerSelection.WorkerPath;
+            if (mockPath is null || !_fileSystem.FileExists(mockPath))
+            {
+                var fakeResult = OpennessWorkerLocator.LocateFakeWorker(_appInfo.BaseDirectory, _fileSystem);
+                for (int i = 0; i < fakeResult.Candidates.Count; i++)
+                {
+                    var candidate = fakeResult.Candidates[i];
+                    evidence[$"candidate[{i}].path"] = candidate.Path;
+                    evidence[$"candidate[{i}].exists"] = candidate.Exists.ToString().ToLowerInvariant();
+                }
+
+                return new DiagnosticCheckResult(
+                    Id,
+                    Name,
+                    DiagnosticStatus.Failed,
+                    "Mock worker executable (TiaMcpServer.FakeWorker.exe) was not found.",
+                    "Build the solution and ensure TiaMcpServer.FakeWorker is built before running in mock mode.",
+                    evidence);
+            }
+
+            evidence["selectedPath"] = mockPath;
+            var mockVersion = _fileSystem.GetFileVersion(mockPath);
+            evidence["workerVersion"] = mockVersion;
+
+            var mockMessage = mockVersion is not null
+                ? $"Mock worker found at {mockPath} (version {mockVersion}, mock mode enabled)."
+                : $"Mock worker found at {mockPath} (mock mode enabled).";
+
+            return new DiagnosticCheckResult(
+                Id,
+                Name,
+                DiagnosticStatus.Passed,
+                mockMessage,
+                null,
+                evidence);
+        }
+
+        if (_workerSelection?.WorkerPath is not null)
+        {
+            evidence["workerSelectionSource"] = _workerSelection.Source.ToString();
+            var overridePath = _workerSelection.WorkerPath;
+            evidence["selectedPath"] = overridePath;
+
+            if (!_fileSystem.FileExists(overridePath))
+            {
+                return new DiagnosticCheckResult(
+                    Id,
+                    Name,
+                    DiagnosticStatus.Failed,
+                    $"Specified worker executable was not found at '{overridePath}'.",
+                    "Ensure the specified worker path points to a valid executable.",
+                    evidence);
+            }
+
+            var overrideVersion = _fileSystem.GetFileVersion(overridePath);
+            evidence["workerVersion"] = overrideVersion;
+
+            var overrideMessage = overrideVersion is not null
+                ? $"Worker found at {overridePath} (version {overrideVersion}, override enabled)."
+                : $"Worker found at {overridePath} (override enabled).";
+
+            return new DiagnosticCheckResult(
+                Id,
+                Name,
+                DiagnosticStatus.Passed,
+                overrideMessage,
+                null,
+                evidence);
+        }
+
+        var result = OpennessWorkerLocator.Locate(_appInfo.BaseDirectory, _fileSystem);
 
         for (int i = 0; i < result.Candidates.Count; i++)
         {

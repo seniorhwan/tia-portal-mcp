@@ -263,12 +263,12 @@ public sealed class PersistentWorkerTransport : IDisposable
     private async Task<string> CaptureCrashDetailAsync()
     {
         var pump = _stderrPump;
-        KillProcess();
         if (pump is not null)
         {
-            // Give the pump a moment to drain the dying process's final stderr lines.
+            // Allow the pump to drain the dying process's final stderr lines before killing/disposing the stream.
             await Task.WhenAny(pump, Task.Delay(TimeSpan.FromSeconds(2))).ConfigureAwait(false);
         }
+        KillProcess();
 
         var lines = _recentStderr.ToArray();
         return lines.Length == 0 ? "No response was written." : string.Join(" | ", lines);

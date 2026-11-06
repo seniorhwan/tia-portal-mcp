@@ -20,6 +20,8 @@ public static class OpennessWorkerLocator
 {
     private const string WorkerExecutableName = "TiaMcpServer.OpennessWorker.exe";
     private const string WorkerFolderName = "openness-worker";
+    private const string FakeWorkerExecutableName = "TiaMcpServer.FakeWorker.exe";
+    private const string FakeWorkerFolderName = "fake-worker";
 
     public static WorkerLocationResult Locate(string baseDirectory, IFileSystemService fileSystem)
     {
@@ -68,7 +70,65 @@ public static class OpennessWorkerLocator
 
         var inspected = string.Join("; ", result.Candidates.Select(c => c.Path));
         throw new FileNotFoundException(
-            "TIA Openness worker executable was not found. Build the solution and ensure the openness-worker folder is beside the MCP server executable. Inspected: " + inspected,
+            "TIA Openness worker executable was not found. Build the solution and ensure the openness-worker folder is beside the MCP server executable, or use --mock / TIA_MCP_WORKER_PATH for offline testing. Inspected: " + inspected,
             result.Candidates.FirstOrDefault()?.Path ?? WorkerExecutableName);
+    }
+
+    public static WorkerLocationResult LocateFakeWorker(string baseDirectory, IFileSystemService fileSystem)
+    {
+        var candidates = new List<WorkerCandidate>();
+
+        var packagedPath = Path.Combine(baseDirectory, FakeWorkerFolderName, FakeWorkerExecutableName);
+        candidates.Add(new WorkerCandidate(packagedPath, fileSystem.FileExists(packagedPath)));
+        if (fileSystem.FileExists(packagedPath))
+        {
+            return new WorkerLocationResult(true, packagedPath, candidates);
+        }
+
+        var besideHostPath = Path.Combine(baseDirectory, FakeWorkerExecutableName);
+        candidates.Add(new WorkerCandidate(besideHostPath, fileSystem.FileExists(besideHostPath)));
+        if (fileSystem.FileExists(besideHostPath))
+        {
+            return new WorkerLocationResult(true, besideHostPath, candidates);
+        }
+
+        var directory = new DirectoryInfo(baseDirectory);
+        while (directory is not null)
+        {
+            foreach (var configuration in new[] { "Debug", "Release" })
+            {
+                var candidatePath = Path.Combine(
+                    directory.FullName,
+                    "TiaMcpServer.FakeWorker",
+                    "bin",
+                    configuration,
+                    "net10.0",
+                    FakeWorkerExecutableName);
+
+                candidates.Add(new WorkerCandidate(candidatePath, fileSystem.FileExists(candidatePath)));
+                if (fileSystem.FileExists(candidatePath))
+                {
+                    return new WorkerLocationResult(true, candidatePath, candidates);
+                }
+            }
+
+            directory = directory.Parent;
+        }
+
+        return new WorkerLocationResult(false, null, candidates);
+    }
+
+    public static string LocateFakeWorkerOrThrow(string baseDirectory, IFileSystemService fileSystem)
+    {
+        var result = LocateFakeWorker(baseDirectory, fileSystem);
+        if (result.Found)
+        {
+            return result.SelectedPath!;
+        }
+
+        var inspected = string.Join("; ", result.Candidates.Select(c => c.Path));
+        throw new FileNotFoundException(
+            "TIA Mock worker executable (TiaMcpServer.FakeWorker.exe) was not found. Build the solution and ensure TiaMcpServer.FakeWorker is built. Inspected: " + inspected,
+            result.Candidates.FirstOrDefault()?.Path ?? FakeWorkerExecutableName);
     }
 }

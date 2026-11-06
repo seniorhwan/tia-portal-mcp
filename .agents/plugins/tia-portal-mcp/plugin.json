@@ -1,0 +1,20 @@
+{
+  "name": "tia-portal-mcp",
+  "displayName": "Siemens TIA Portal MCP",
+  "version": "1.0.0",
+  "description": "Siemens TIA Portal V21 automation plugin for Antigravity agents: browse, read, and write PLC blocks, tags, hardware network topology, Unified HMI alarms, VCI version control, and compile check.",
+  "author": {
+    "name": "seniorhwan",
+    "url": "https://github.com/seniorhwan/tia-portal-mcp"
+  },
+  "homepage": "https://github.com/seniorhwan/tia-portal-mcp",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/seniorhwan/tia-portal-mcp"
+  },
+  "suggestedPrompts": [
+    "Run TIA Portal doctor check to verify local Siemens Openness environment",
+    "Browse active TIA Portal project tree and list all PLC blocks and tag tables",
+    "Run compile check on the active PLC station and summarize diagnostic warnings"
+  ]
+}
